@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "allocator.hpp"
+#include "unidir_list-type_container.hpp"
 
 // Тип ключа и значения
 using KeyType = int;
@@ -22,6 +23,12 @@ using MyMap = std::map<KeyType, ValueType, std::less<KeyType>, MyAllocator>;
 
 // map с аллокатором по умолчанию
 using StdMap = std::map<KeyType, ValueType>;
+
+// Мой контейнер спискового типа (однонаправленный список)
+using MyList = MyUniDirListTypeContainer<int>;
+
+// Мой контейнер спискового типа c моим аллокатром
+using MyListAlloc = MyUniDirListTypeContainer<int, MyAllocator>;
 
 // --- Вспомогательные функции ---
 
@@ -42,6 +49,18 @@ void printMapContents(const MapType& map) {
     }
 }
 
+// Функция вывода содержимого моего list контейнера
+template <typename T>
+void PrintMyContainer(const T& myContainer) {
+    for (size_t i = 0; i < myContainer.size(); i++) {
+        if (i != 0) {
+            std::cout << ", ";
+        }
+        std::cout << myContainer[i];
+    }
+    std::cout << std::endl;
+}
+
 int main() {
     try {
         StdMap std_map;
@@ -58,12 +77,30 @@ int main() {
             my_map[i] = factorial(i);
         }
 
+        MyList my_list;
+        // Заполнение 10 элементами — int
+        for (int i = 0; i < 10; ++i) {
+            my_list.push_back(i);
+        }
+
+        MyListAlloc my_list_alloc;
+        // Заполнение 10 элементами — int
+        for (int i = 0; i < 10; ++i) {
+            my_list_alloc.push_back(i);
+        }
+
         // Выводим содержимое контейнеров
         std::cout << "StdMap (std::map со стандартным аллокатором):\n";
         printMapContents(std_map);
 
         std::cout << "\nMyMap (std::map с моим аллокатором):\n";
         printMapContents(my_map);
+
+        std::cout << "\nMyList (мой контейнер со стандартным аллокатором):\n";
+        PrintMyContainer(my_list);
+
+        std::cout << "\nMyListalloc (мой контейнер с моим аллокатором):\n";
+        PrintMyContainer(my_list_alloc);
 
     } catch (const std::bad_alloc& e) {
         std::cerr << "Ошибка выделения памяти, превышено количество элементов: "

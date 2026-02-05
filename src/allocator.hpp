@@ -8,12 +8,19 @@ template <typename T, std::size_t N>
 class FixedAllocator {
 public:
     using value_type = T;
-    using pointer = T*;
-    using const_pointer = const T*;
-    using reference = T&;
-    using const_reference = const T&;
+    using pointer = T*;              // (deprecated in C++17)(removed in C++20)
+    using const_pointer = const T*;  // (deprecated in C++17)(removed in C++20)
+    using reference = T&;            // (deprecated in C++17)(removed in C++20)
+    using const_reference =
+        const T&;  // (deprecated in C++17)(removed in C++20)
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
+
+    using propagate_on_container_move_assignment = std::true_type;
+    using propagate_on_container_copy_assignment = std::false_type;
+    using propagate_on_container_swap = std::false_type;
+
+    using is_always_equal = std::false_type;
 
     // rebind для STL-совместимости
     template <class U>
@@ -42,8 +49,10 @@ public:
         if (count == 0) {
             return nullptr;
         }
-        if (count > N || allocated_count + count > N) {
-            throw std::bad_alloc();  // Превышение лимита
+        if (count > N || allocated_count + count > N ||
+            N > std::size_t(-1) / sizeof(value_type)) {
+            throw std::bad_alloc();  // Превышение лимита или максимального
+                                     // размера
         }
         if (!memory_block) {
             // Выделить единый блок на N элементов c выравниванием памяти
@@ -79,7 +88,30 @@ public:
     auto max_size() const noexcept -> size_type {
         return N;
     }
+
+    template <typename U, std::size_t M>
+    friend class FixedAllocator;
+
+    template <typename U, std::size_t M>
+    friend auto operator==(const FixedAllocator&,
+                           const FixedAllocator<U, M>&) noexcept -> bool;
+
+    template <typename U, std::size_t M>
+    friend auto operator!=(const FixedAllocator&,
+                           const FixedAllocator<U, M>&) noexcept -> bool;
 private:
     pointer memory_block = nullptr;  // Единый блок памяти
     size_type allocated_count{0};    // Сколько уже выделено
 };
+
+template <typename T, std::size_t N, typename U, std::size_t M>
+auto operator==(const FixedAllocator<T, N>&,
+                const FixedAllocator<U, M>&) noexcept -> bool {
+    return N == M;
+}
+
+template <typename T, std::size_t N, typename U, std::size_t M>
+auto operator!=(const FixedAllocator<T, N>& lhs,
+                const FixedAllocator<U, M>& rhs) noexcept -> bool {
+    return !(lhs == rhs);
+}

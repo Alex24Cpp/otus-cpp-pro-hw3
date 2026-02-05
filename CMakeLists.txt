@@ -19,6 +19,7 @@ endif()
 add_executable(allocator
     src/main.cpp
     src/allocator.hpp
+    src/unidir_list-type_container.hpp
 )
 #add_executable(gtest_allocator
  #   test/gtest_allocator.cpp
