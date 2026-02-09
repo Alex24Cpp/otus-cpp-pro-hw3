@@ -13,6 +13,7 @@ using KeyType = int;
 using ValueType = int;
 
 constexpr std::size_t POOL_SIZE = 10;
+constexpr int ELEMENTS_NUMBER = 10;
 
 // Аллокатор на 10 элементов
 using MyAllocator =
@@ -25,7 +26,7 @@ using MyMap = std::map<KeyType, ValueType, std::less<KeyType>, MyAllocator>;
 using StdMap = std::map<KeyType, ValueType>;
 
 // Мой контейнер спискового типа (однонаправленный список)
-using MyList = MyUniDirListTypeContainer<int>;
+using MyListStd = MyUniDirListTypeContainer<int>;
 
 // Мой контейнер спискового типа c моим аллокатром
 using MyListAlloc = MyUniDirListTypeContainer<int, MyAllocator>;
@@ -51,14 +52,22 @@ void printMapContents(const MapType& map) {
 
 // Функция вывода содержимого моего list контейнера
 template <typename T>
-void PrintMyContainer(const T& myContainer) {
-    for (size_t i = 0; i < myContainer.size(); i++) {
+void printMyContainer(const T& my_container) {
+    for (size_t i = 0; i < my_container.size(); i++) {
         if (i != 0) {
             std::cout << ", ";
         }
-        std::cout << myContainer[i];
+        std::cout << my_container[i];
     }
-    std::cout << std::endl;
+    std::cout << "\n";
+}
+
+template <typename T>
+void printMyContainerIt(const T& my_container) {
+    for (const auto& elemet : my_container) {
+        std::cout << elemet << " ";
+    }
+    std::cout << "\n";
 }
 
 int main() {
@@ -66,26 +75,26 @@ int main() {
         StdMap std_map;
         // Заполнение 10 элементами: ключ — число от 0 до 9, значение —
         // факториал ключа
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < ELEMENTS_NUMBER; ++i) {
             std_map[i] = factorial(i);
         }
 
         MyMap my_map;
         // Заполнение 10 элементами: ключ — число от 0 до 9, значение —
         // факториал ключа
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < ELEMENTS_NUMBER; ++i) {
             my_map[i] = factorial(i);
         }
 
-        MyList my_list;
+        MyListStd my_list;
         // Заполнение 10 элементами — int
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < ELEMENTS_NUMBER; ++i) {
             my_list.push_back(i);
         }
 
         MyListAlloc my_list_alloc;
         // Заполнение 10 элементами — int
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < ELEMENTS_NUMBER; ++i) {
             my_list_alloc.push_back(i);
         }
 
@@ -97,10 +106,10 @@ int main() {
         printMapContents(my_map);
 
         std::cout << "\nMyList (мой контейнер со стандартным аллокатором):\n";
-        PrintMyContainer(my_list);
+        printMyContainer(my_list);
 
-        std::cout << "\nMyListalloc (мой контейнер с моим аллокатором):\n";
-        PrintMyContainer(my_list_alloc);
+        std::cout << "\nMyListAlloc (мой контейнер с моим аллокатором):\n";
+        printMyContainerIt(my_list_alloc);
 
     } catch (const std::bad_alloc& e) {
         std::cerr << "Ошибка выделения памяти, превышено количество элементов: "

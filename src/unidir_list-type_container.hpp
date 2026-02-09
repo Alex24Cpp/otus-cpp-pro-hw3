@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iterator>
 #include <memory>
 
 template <typename T>
@@ -29,6 +30,7 @@ public:
     size_t size() const;
     T operator[](size_t index) const;
     void clear();
+    bool empty() const;
     // Добавлено для параметризации аллокатором
     using value_type = T;
     using allocator_type = Allocator;
@@ -38,29 +40,115 @@ public:
     using node_allocator_type = typename std::allocator_traits<
         allocator_type>::template rebind_alloc<node_type>;
     using node_allocator_traits = std::allocator_traits<node_allocator_type>;
+
+    // Итератор для однонаправленного списка (ForwardIterator)
+    class iterator {  // объявление класса iterator
+    public:
+        using iterator_category =
+            std::forward_iterator_tag;  // категория итератора
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+        // конструктор от указателя
+        iterator(node_type* ptr) noexcept : m_ptr(ptr) {
+        }
+        reference operator*() const noexcept {  // разыменование
+            return m_ptr->m_data;
+        }
+        pointer operator->() const noexcept {  // доступ к членам
+            return &m_ptr->m_data;
+        }
+        iterator& operator++() noexcept {  // префиксный инкремент
+            m_ptr = m_ptr->m_next;
+            return *this;
+        }
+        iterator operator++(int) noexcept {  // постфиксный инкремент
+            iterator temp = *this;
+            m_ptr = m_ptr->m_next;
+            return temp;
+        }
+        bool operator==(const iterator& other) const noexcept {
+            return m_ptr == other.m_ptr;
+        }
+        bool operator!=(const iterator& other) const noexcept {
+            return m_ptr != other.m_ptr;
+        }
+    private:
+        node_type* m_ptr;  // внутренний указатель на узел
+    };
+
+    // Константный итератор
+    class const_iterator {  // объявление класса const_iterator
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T*;
+        using reference = const T&;
+
+        const_iterator(const node_type* ptr) noexcept : m_ptr(ptr) {
+        }
+        const_iterator(const iterator& it) noexcept : m_ptr(it.m_ptr) {
+        }
+        reference operator*() const noexcept {
+            return m_ptr->m_data;
+        }
+        pointer operator->() const noexcept {
+            return &m_ptr->m_data;
+        }
+        const_iterator& operator++() noexcept {
+            m_ptr = m_ptr->m_next;
+            return *this;
+        }
+        const_iterator operator++(int) noexcept {
+            const_iterator temp = *this;
+            m_ptr = m_ptr->m_next;
+            return temp;
+        }
+        bool operator==(const const_iterator& other) const noexcept {
+            return m_ptr == other.m_ptr;
+        }
+        bool operator!=(const const_iterator& other) const noexcept {
+            return m_ptr != other.m_ptr;
+        }
+    private:
+        const node_type* m_ptr;
+    };
+    iterator begin() noexcept {
+        return iterator(m_head);
+    }
+    iterator end() noexcept {
+        return iterator(nullptr);
+    }
+    const_iterator begin() const noexcept {  // const begin() для const-объектов
+        return const_iterator(m_head);
+    }
+
+    const_iterator end() const noexcept {  // const end() для const-объектов
+        return const_iterator(nullptr);
+    }
+
+    const_iterator cbegin()
+        const noexcept {  // cbegin() — всегда const-итератор
+        return const_iterator(m_head);
+    }
+
+    const_iterator cend()
+        const noexcept {  // cend() — всегда const-итератор конца
+        return const_iterator(nullptr);
+    }
 private:
     node_type* m_head{nullptr};
     node_type* m_tail{nullptr};
     size_type m_size{0};
     node_allocator_type
-        m_node_allocator{};  // Добавлено для параметризации аллокатором
+        m_node_allocator{};  // добавлено для параметризации аллокатором
     void free_up_memory();
     // Добавлено для параметризации аллокатором
-    node_type* createNode(const T& value) {
-        node_type* node = node_allocator_traits::allocate(m_node_allocator, 1U);
-        try {
-            node_allocator_traits::construct(m_node_allocator, node, value);
-        } catch (...) {
-            node_allocator_traits::deallocate(m_node_allocator, node, 1U);
-            throw;
-        }
-        return node;
-    }
+    node_type* createNode(const T& value);
 
-    void destroyNode(node_type* node) {
-        node_allocator_traits::destroy(m_node_allocator, node);
-        node_allocator_traits::deallocate(m_node_allocator, node, 1U);
-    }
+    void destroyNode(node_type* node);
 };
 
 template <typename T, typename Allocator>
@@ -176,7 +264,7 @@ void MyUniDirListTypeContainer<T, Allocator>::push_front(T value) {
 
 template <typename T, typename Allocator>
 int MyUniDirListTypeContainer<T, Allocator>::insert(T value, size_t index) {
-    if (index >= m_size) {
+    if (index >= m_size && !(index == 0 && m_size == 0)) {
         return -1;
     }
     node_type* new_node = createNode(value);
@@ -185,7 +273,7 @@ int MyUniDirListTypeContainer<T, Allocator>::insert(T value, size_t index) {
         m_head = new_node;
         new_node->m_next = node;
     } else {
-        for (size_t i = 0; i < index - 1 || i == 1; ++i) {
+        for (size_t i = 0; i < index - 1; ++i) {
             node = node->m_next;
         }
         new_node->m_next = node->m_next;
@@ -230,27 +318,25 @@ int MyUniDirListTypeContainer<T, Allocator>::erase(size_t first, size_t last) {
         node_type* afterNode{nullptr};
         if (first == 0) {
             if (m_head == m_tail) {
-                delete m_head;
-                m_head = m_tail = {nullptr};
+                destroyNode(m_head);
+                m_head = m_tail = nullptr;
+                m_size = 0;
                 return 0;
             }
             nodeDelStart = m_head;
         } else {
-            for (size_t i = 0; i < first - 1 || i == 1; ++i) {
+            for (size_t i = 0; i < first - 1; ++i) {
                 preNode = preNode->m_next;
             }
             nodeDelStart = preNode->m_next;
         }
 
         if (last == m_size - 1) {
-            for (size_t i = 0; i < last || i == 1; ++i) {
-                nodeDelEnd = nodeDelEnd->m_next;
-            }
             nodeDelEnd = m_tail;
             afterNode = nullptr;
             m_tail = preNode;
         } else {
-            for (size_t i = 0; i < last || i == 1; ++i) {
+            for (size_t i = 0; i < last; ++i) {
                 nodeDelEnd = nodeDelEnd->m_next;
             }
             afterNode = nodeDelEnd->m_next;
@@ -295,6 +381,11 @@ void MyUniDirListTypeContainer<T, Allocator>::clear() {
 }
 
 template <typename T, typename Allocator>
+bool MyUniDirListTypeContainer<T, Allocator>::empty() const {
+    return m_size == 0;
+}
+
+template <typename T, typename Allocator>
 void MyUniDirListTypeContainer<T, Allocator>::free_up_memory() {
     if (m_head != nullptr && m_tail != nullptr) {
         for (node_type* temp; m_head != nullptr; m_head = temp) {
@@ -302,4 +393,24 @@ void MyUniDirListTypeContainer<T, Allocator>::free_up_memory() {
             destroyNode(m_head);
         }
     }
+}
+
+template <typename T, typename Allocator>
+typename MyUniDirListTypeContainer<T, Allocator>::node_type*
+MyUniDirListTypeContainer<T, Allocator>::createNode(const T& value) {
+    node_type* node = node_allocator_traits::allocate(m_node_allocator, 1U);
+    try {
+        node_allocator_traits::construct(m_node_allocator, node, value);
+    } catch (...) {
+        node_allocator_traits::deallocate(m_node_allocator, node, 1U);
+        throw;
+    }
+    return node;
+}
+
+template <typename T, typename Allocator>
+void MyUniDirListTypeContainer<T, Allocator>::destroyNode(
+    typename MyUniDirListTypeContainer<T, Allocator>::node_type* node) {
+    node_allocator_traits::destroy(m_node_allocator, node);
+    node_allocator_traits::deallocate(m_node_allocator, node, 1U);
 }
