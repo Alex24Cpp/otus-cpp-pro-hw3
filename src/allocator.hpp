@@ -49,26 +49,58 @@ public:
         if (count == 0) {
             return nullptr;
         }
-        if (count > N || allocated_count + count > N ||
-            N > std::size_t(-1) / sizeof(value_type)) {
-            throw std::bad_alloc();  // Превышение лимита или максимального
-                                     // размера
+        if (count != 1) {  // аллокатор выделяет только по одному элементу
+            throw std::bad_alloc();
         }
+
         if (!memory_block) {
             // Выделить единый блок на N элементов c выравниванием памяти
             memory_block = reinterpret_cast<pointer>(::operator new(
                 N * sizeof(value_type),
                 static_cast<std::align_val_t>(alignof(value_type))));
+
             allocated_count = 0;
+
+            // Создать индексный free‑list
+            // next_index[i] = i+1, последний = -1
+            for (size_type i = 0; i + 1 < N; ++i) {
+                next_index[i] = static_cast<int>(i + 1);
+            }
+            next_index[N - 1] = -1;  // конец списка
+            free_head = 0;  // первый свободный индекс
         }
-        pointer result = memory_block + allocated_count;
-        allocated_count += count;
-        return result;
+
+        // Проверка свободных слотов
+        if (free_head == -1) {
+            throw std::bad_alloc();  // свободных слотов нет
+        }
+
+        // Выделение слота по индексу
+        const int index = free_head;
+        free_head = next_index[index];  // сдвиг головы списка
+
+        ++allocated_count;
+
+        return memory_block + index;
     }
 
-    // Освобождение (не делаать ничего для отдельных элементов)
-    // память освобождается только в деструкторе
-    void deallocate(pointer, size_type) noexcept {
+    // Память освобождается только в деструкторе
+    // слот вернуть во free‑list
+    void deallocate(pointer ptr, size_type count) noexcept {
+        if (!ptr || count == 0) {
+            return;
+        }
+
+        // вычисление индекса слота
+        const size_type index = static_cast<size_type>(ptr - memory_block);
+
+        // возврат индекса в начало списка свободных
+        next_index[index] = free_head;
+        free_head = static_cast<int>(index);
+
+        if (allocated_count > 0) {
+            --allocated_count;
+        }
     }
 
     // Конструктор/деструктор
@@ -102,6 +134,13 @@ public:
 private:
     pointer memory_block = nullptr;  // Единый блок памяти
     size_type allocated_count{0};    // Сколько уже выделено
+
+    // Индексный free‑list:
+    // next_index[i] = индекс следующего свободного слота
+    // next_index[i] = i+1, последний = -1
+    int next_index[N]{};
+    // Голова списка индексов свободных слотов
+    int free_head{-1};
 };
 
 template <typename T, std::size_t N, typename U, std::size_t M>
